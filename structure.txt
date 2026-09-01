@@ -1,0 +1,120 @@
+call_me_maybe/
+│
+├── Makefile
+├── README.md
+├── requirements.txt
+│
+├── llm_sdk/
+│   ├── ...
+│   └── ...
+│
+├── data/
+│   ├── input/
+│   │   ├── function_definitions.json
+│   │   └── function_calling_tests.json
+│   │
+│   └── output/
+│       └── function_calling_results.json
+│
+├── src/
+│   ├── __init__.py
+│   ├── main.py
+│   │
+│   ├── functions.py
+│   ├── parser.py
+│   ├── constrained_decoding.py
+│   └── generator.py
+│
+└── tests/
+    ├── test_parser.py
+    ├── test_constrained_decoding.py
+    └── test_generator.py
+
+
+decoder.py
+Créer un set vide
+Il servira à stocker les tokens autorisés.
+Parcourir toutes les fonctions
+Pour chaque fonction, récupérer sa liste de token IDs.
+Vérifier si la fonction commence par le prefix actuel
+Comparer le début de token_ids avec prefix.
+Si le préfixe correspond
+Regarder le token situé juste après le préfixe.
+Ajouter ce token au set
+Le set évite automatiquement les doublons.
+Après avoir parcouru toutes les fonctions
+Retourner le set des tokens autor
+
+
+"""Constrained decoding utilities."""
+
+IMPORTER Small_LLM_Model depuis llm_sdk
+IMPORTER FunctionDefinition depuis .functions
+
+
+FONCTION build_function_name_tokens(model, function_definitions: list[FunctionDefinition]) -> dict[str, list[int]]:
+    """Construit le mapping nom_de_fonction -> liste de token_ids, avec les VRAIS tokens du modèle."""
+    résultat = dictionnaire vide
+    POUR chaque fonction DANS function_definitions:
+        tensor_tokens = model.encode(fonction.name)
+        # le tensor est en 2D, il faut l'aplatir en simple liste d'entiers
+        tokens = convertir tensor_tokens en list[int]
+        résultat[fonction.name] = tokens
+    RETOURNER résultat
+
+
+FONCTION get_next_allowed_tokens(function_name_tokens: dict[str, list[int]], prefix: list[int]) -> set[int]:
+    """Retourne l'ensemble des tokens valides pour continuer, selon ce qui est déjà généré."""
+    allowed = ensemble vide
+    POUR chaque (nom, tokens) DANS function_name_tokens.items():
+        SI tokens[:len(prefix)] == prefix ET len(prefix) < len(tokens):
+            allowed.ajouter(tokens[len(prefix)])
+    RETOURNER allowed
+
+
+FONCTION is_function_name_complete(function_name_tokens: dict[str, list[int]], prefix: list[int]) -> str | None:
+    """Retourne le nom de fonction si prefix correspond EXACTEMENT à ses tokens complets."""
+    POUR chaque (nom, tokens) DANS function_name_tokens.items():
+        SI tokens == prefix:
+            RETOURNER nom
+    RETOURNER None
+
+
+SI ce script est exécuté directement:
+    # test manuel : charger les vraies fonctions, construire le mapping, tester
+    charger les FunctionDefinition via parser_functions
+    créer une instance de Small_LLM_Model
+    construire function_name_tokens avec build_function_name_tokens
+    afficher function_name_tokens pour vérifier
+
+    tester get_next_allowed_tokens avec un prefix vide []
+    afficher le résultat
+
+
+functions = {
+"fn_add_numbers":[8822, 2891, 329 64],
+"fn_greet": [8822, 1889, 3744],
+"fn_reverse_string":[8822, 43277, 3904],
+"fn_get_square_root":[8822, 3062, 39794, 12993]
+}
+
+def get_allowed_tokens(functions: dict[str, list[int]]) -> set[int]:
+    allowed_tokens = set()
+    for token_ids in functions.values():
+        allowed_tokens.add(token_ids[0])
+    return allowed_tokens
+
+
+def get_next_allowed_tokens(functions: dict[str, list[int]], prefix: list[int]) -> set[int]:
+    """tokens used after preffix"""
+    allowed_tokens = set()
+    for token_ids in functions.values():
+        if token_ids[:len(prefix)] == prefix and len(prefix) < len(token_ids):
+            allowed_tokens.add(token_ids[len(prefix)]) 
+    return allowed_tokens
+
+if __name__ == "__main__":
+    print(get_allowed_tokens(functions))
+    prefix = [8822, 3062, 39794, 12993]
+    print(get_next_allowed_tokens(functions, prefix))
+    

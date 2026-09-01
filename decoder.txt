@@ -1,0 +1,243 @@
+
+"""Constrained decoding utilities."""
+
+IMPORTER Small_LLM_Model depuis llm_sdk
+IMPORTER FunctionDefinition depuis .functions
+
+
+FONCTION build_function_name_tokens(model, function_definitions: list[FunctionDefinition]) -> dict[str, list[int]]:
+    """Construit le mapping nom_de_fonction -> liste de token_ids, avec les VRAIS tokens du modèle."""
+    résultat = dictionnaire vide
+    POUR chaque fonction DANS function_definitions:
+        tensor_tokens = model.encode(fonction.name)
+        # le tensor est en 2D, il faut l'aplatir en simple liste d'entiers
+        tokens = convertir tensor_tokens en list[int]
+        résultat[fonction.name] = tokens
+    RETOURNER résultat
+
+
+FONCTION get_next_allowed_tokens(function_name_tokens: dict[str, list[int]], prefix: list[int]) -> set[int]:
+    """Retourne l'ensemble des tokens valides pour continuer, selon ce qui est déjà généré."""
+    allowed = ensemble vide
+    POUR chaque (nom, tokens) DANS function_name_tokens.items():
+        SI tokens[:len(prefix)] == prefix ET len(prefix) < len(tokens):
+            allowed.ajouter(tokens[len(prefix)])
+    RETOURNER allowed
+
+
+FONCTION is_function_name_complete(function_name_tokens: dict[str, list[int]], prefix: list[int]) -> str | None:
+    """Retourne le nom de fonction si prefix correspond EXACTEMENT à ses tokens complets."""
+    POUR chaque (nom, tokens) DANS function_name_tokens.items():
+        SI tokens == prefix:
+            RETOURNER nom
+    RETOURNER None
+
+
+SI ce script est exécuté directement:
+    # test manuel : charger les vraies fonctions, construire le mapping, tester
+    charger les FunctionDefinition via parser_functions
+    créer une instance de Small_LLM_Model
+    construire function_name_tokens avec build_function_name_tokens
+    afficher function_name_tokens pour vérifier
+
+    tester get_next_allowed_tokens avec un prefix vide []
+    afficher le résultat
+
+
+
+
+FONCTION generate_function_name(model, prompt: str, function_name_tokens: dict[str, list[int]]) -> str:
+    """Génère token par token le nom de fonction choisi par le modèle,
+    en respectant les contraintes de function_name_tokens."""
+
+    # Étape A.1 : encoder le prompt de départ
+    prompt_tokens = model.encode(prompt)   # tensor 2D
+    prompt_tokens = convertir en liste Python plate  # via [0].tolist()
+
+    generated = liste vide  # les tokens du nom en cours de génération
+
+    # Étape A.2 : boucle de génération contrainte
+    TANT QUE is_function_name_complete(function_name_tokens, generated) est None:
+
+        # construire la séquence complète à donner au modèle : prompt + ce qui est généré jusqu'ici
+        current_input = prompt_tokens + generated
+
+        # obtenir les logits pour le prochain token
+        logits = model.get_logits_from_input_ids(current_input)
+
+        # calculer les tokens autorisés à cet instant
+        allowed = get_next_allowed_tokens(function_name_tokens, generated)
+
+        SI allowed est vide:
+            # cas anormal (ne devrait pas arriver si function_name_tokens est bien construit)
+            LEVER une erreur claire
+
+        # parmi les tokens autorisés, choisir celui avec le plus haut logit
+        meilleur_token = argmax sur { token_id : logits[token_id] POUR token_id DANS allowed }
+
+        # ajouter ce token à la séquence en cours de génération
+        generated.ajouter(meilleur_token)
+
+    # Étape A.3 : la boucle s'est arrêtée, generated correspond à un nom complet
+    nom_choisi = is_function_name_complete(function_name_tokens, generated)
+    RETOURNER nom_choisi
+
+
+
+if __name__ == "__main__":
+    functions = parser_functions("data/input/functions_definition.json")
+    model = Small_LLM_Model()
+
+    # 1. Build the mapping
+    function_name_tokens = build_function_name_tokens(model, functions)
+
+    print("\nFunction name tokens:")
+    print(function_name_tokens)
+
+    # 2. Get the tokens of the first function
+    first_function_name = list(function_name_tokens.keys())[0]
+    first_function = function_name_tokens[first_function_name]
+
+    print("\nFirst function name:")
+    print(first_function_name)
+
+    print("\nFirst function tokens:")
+    print(first_function)
+
+    # 3. Test with an empty prefix
+    prefix = []
+
+    print("\nAllowed tokens for empty prefix:")
+    print(get_next_allowed_tokens(function_name_tokens, prefix))
+
+    # 4. Test with the first token
+    prefix = first_function[:1]
+
+    print("\nPrefix with first token:")
+    print(prefix)
+
+    print("\nAllowed tokens after first token:")
+    print(get_next_allowed_tokens(function_name_tokens, prefix))
+
+    # 5. Test with the first two tokens
+    prefix = first_function[:2]
+
+    print("\nPrefix with first two tokens:")
+    print(prefix)
+
+    print("\nAllowed tokens after two tokens:")
+    print(get_next_allowed_tokens(function_name_tokens, prefix))
+
+    # 6. Test complete function name
+    prefix = first_function
+
+    print("\nComplete prefix:")
+    print(prefix)
+
+    print("\nCompleted function:")
+    print(is_function_name_complete(function_name_tokens, prefix))
+
+    # 7. Test incomplete prefix
+    prefix = first_function[:-1]
+
+    print("\nIncomplete prefix:")
+    print(prefix)
+
+    print("\nCompleted function:")
+    print(is_function_name_complete(function_name_tokens, prefix))
+
+
+
+
+RECEVOIR le prompt utilisateur
+
+AJOUTER les instructions nécessaires
+pour dire au modèle qu'il doit choisir une fonction
+
+ENCODER le texte avec le tokenizer du modèle
+
+TRANSFORMER les tokens obtenus
+en une liste simple de token IDs
+
+INITIALISER le prefix généré à une liste vide
+
+
+TANT QUE le nom de fonction n'est pas terminé :
+
+    prendre les tokens du prompt
+
+    AJOUTER les tokens déjà générés du nom
+    au prompt
+
+    ENVOYER tous ces tokens à Qwen
+
+    RÉCUPÉRER les logits du prochain token
+
+    DEMANDER au constrained decoder :
+        "Quels tokens sont autorisés après mon prefix actuel ?"
+
+    OBTENIR allowed_tokens
+
+    SI aucun token n'est autorisé :
+        arrêter avec une erreur
+
+    PARMI les allowed_tokens :
+
+        regarder le logit de chaque token
+
+        trouver celui qui possède
+        le meilleur score
+
+    AJOUTER ce token au prefix
+
+    VÉRIFIER si le prefix correspond
+    exactement à une fonction complète
+
+    SI une fonction complète est trouvée :
+        arrêter la boucle
+
+
+PRENDRE prefix
+
+COMPARER prefix
+avec les tokens complets de chaque fonction
+
+SI prefix correspond exactement
+aux tokens d'une fonction :
+
+    récupérer le nom de cette fonction
+
+    arrêter la génération
+
+
+🟢 Résumé de toute l'étape A
+
+                PROMPT UTILISATEUR
+                       ↓
+                  A.1 ENCODER
+                       ↓
+                 prompt_tokens
+                       ↓
+                 prefix = []
+                       ↓
+              ┌──── BOUCLE ────┐
+              │                │
+              │    QWEN        │
+              │      ↓         │
+              │    logits      │
+              │      ↓         │
+              │  allowed       │
+              │    tokens      │
+              │      ↓         │
+              │ meilleur token  │
+              │      ↓         │
+              │ ajouter prefix │
+              │      ↓         │
+              │ fonction       │
+              │ complète ?      │
+              │    ↙     ↘      │
+              │  NON     OUI   │
+              │   ↑       ↓    │
+              └───┘    A.3 FIN │
+                         ↓
+                  nom fonction
