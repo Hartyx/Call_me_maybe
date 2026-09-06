@@ -54,6 +54,8 @@ def generate_function_name(model, prompt: str, function_name_tokens: dict[str, l
     return name_choose
 
 
+
+
 if __name__ == "__main__":
     functions = parser_functions("data/input/functions_definition.json")
     model = Small_LLM_Model()
