@@ -31,7 +31,7 @@ def  parser_functions(path_file: str) -> list[FunctionDefinition]:
 
 
 if __name__ == "__main__":
-    result = parser_functions('data/input/function_definition.json')
+    result = parser_functions('data/input/functions_definition.json')
     print(f"Nombre de fonctions chargee: {len(result)}")
     for f in result:
         print(f.name)

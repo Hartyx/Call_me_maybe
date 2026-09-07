@@ -60,10 +60,51 @@ def get_next_allowed_parameter_tokens(
     return allowed
 
 
+def is_parameter_name_complete(parameter_name_tokens: dict[str, list[int]], prefix: list[int]) -> str | None:
+    """Return the parameter name if the prefix exactly
+    matches its full token sequence."""
+    for name, tokens in parameter_name_tokens.items():
+        if tokens == prefix:
+            return name
+    return None
+
+
+def get_colon_token(model: Small_LLM_Model) -> int:
+    """Return the token ID corresponding to the colon character."""
+    tensor_tokens = model.encode(":")
+    return tensor_tokens[0].tolist()[0]
+        
+
+def get_allowed_colon_tokens(colon_token: int) -> set[int]:
+    """Return the set containing the colon token."""
+    result = set()
+    result.add(colon_token)
+    return result
+
+
+def get_allowed_value_tokens(model: Small_LLM_Model, parameter_type: str) -> set[int]:
+    """Return the token IDs allowed for a parameter value type."""
+    result = set()
+    if parameter_type == "boolean":
+        tokens_true = model.encode("True")
+        tokens_false = model.encode("False")
+        result.add(tokens_true[0].tolist()[0])
+        result.add( tokens_false[0].tolist()[0])
+    if parameter_type == "number":
+        for number in "0123456789":
+            tokens_number = model.encode(number)
+            result.add(tokens_number[0].tolist()[0])
+    return result
+
+
 if __name__ == "__main__":
     parameters = parser_functions("data/input/functions_definition.json")
     model = Small_LLM_Model()
 
-    print(get_parameter_names(parameters[0]))
-    print()
-    print(build_parameter_name_tokens(model, parameters[0]))
+    # print(get_parameter_names(parameters[0]))
+    # print()
+    # print(build_parameter_name_tokens(model, parameters[0]))
+
+    print(f"ok: {get_colon_token(model)}\n")
+    # print(f"{get_allowed_colon_tokens(15)}\n")
+    print(get_allowed_value_tokens(model, "number"))

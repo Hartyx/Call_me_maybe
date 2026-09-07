@@ -84,6 +84,38 @@ FONCTION generate_function_name(model, prompt: str, function_name_tokens: dict[s
 
 
 
+
+FONCTION generate_arguments(model, prompt, function_definition):
+    """Génère le JSON des arguments, en respectant le schéma de function_definition."""
+
+    # on part avec le prompt + le nom de fonction déjà généré (contexte complet)
+    # generated_json commence par le caractère "{" (le début du JSON)
+    generated_json = "{"
+    
+    # on garde la trace des paramètres qu'il reste à remplir
+    parametres_restants = liste des noms de function_definition.parameters
+    
+    TANT QUE le JSON n'est pas complet (pas encore de "}" final):
+    
+        # déterminer dans quel "état" on est, selon generated_json
+        etat_actuel = déterminer_etat(generated_json, parametres_restants)
+        
+        # calculer les tokens autorisés selon cet état
+        tokens_autorises = get_allowed_tokens_for_state(etat_actuel, ...)
+        
+        # demander les logits au modèle (prompt + nom de fonction + JSON généré jusqu'ici)
+        logits = model.get_logits_from_input_ids(...)
+        
+        # choisir le meilleur token autorisé (même logique que l'Étape A)
+        meilleur_token = choisir le token avec le meilleur score parmi tokens_autorises
+        
+        # ajouter ce token au JSON en cours de construction
+        generated_json += texte_du_token(meilleur_token)
+        
+        # mettre à jour l'état (un paramètre vient-il d'être complété ? etc.)
+    
+    RETOURNER generated_json (parsé en vrai objet Python)
+
 if __name__ == "__main__":
     functions = parser_functions("data/input/functions_definition.json")
     model = Small_LLM_Model()
@@ -240,4 +272,38 @@ aux tokens d'une fonction :
               │   ↑       ↓    │
               └───┘    A.3 FIN │
                          ↓
-                  nom fonction
+
+
+
+
+
+
+
+# if __name__ == "__main__":
+#     functions = parser_functions("data/input/functions_definition.json")
+#     model = Small_LLM_Model()
+#     function_name_tokens = build_function_name_tokens(model, functions)
+
+#     with open("data/input/functions_definition.json") as f:
+#         fonc = json.load(f)
+#     prompt = f"""Availaale function: {json.dumps(fonc)}
+#     question: Greet shrek
+#     Answer with a JSON object containing "name" and "parameters"
+#     """
+#     result = generate_function_name(model, prompt, function_name_tokens)
+#     print(f"\nFonction Name: {result}\n")
+
+#     tensor = model.encode(prompt)
+#     list_ids = tensor[0].tolist()
+#     print(list_ids)
+
+#     generate = []
+#     for i in range(10):
+#         logit = model.get_logits_from_input_ids(list_ids)
+#         next_id = max(range(len(logit)), key=lambda i: logit[i])
+#         generate.append(next_id)
+#         list_ids.append(next_id)
+
+#     print("generate")
+#     result = model.decode(generate)
+#     print(result)
