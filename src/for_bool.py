@@ -3,10 +3,8 @@ from llm_sdk import Small_LLM_Model
 
 
 def generate_bool_value(
-        model: Small_LLM_Model,
-        ids_list: list[int],
-        id_to_token: dict[int, str]
-        ) -> str:
+    model: Small_LLM_Model, ids_list: list[int], id_to_token: dict[int, str]
+) -> str:
     """Generate a boolean value ('true' or 'false') using the LLM.
 
     Args:
@@ -17,9 +15,6 @@ def generate_bool_value(
     Returns:
         The generated boolean value as a string.
     """
-    result = get_fullname_func(
-        model,
-        ids_list,
-        ["true", "false"],
-        id_to_token)
+
+    result = get_fullname_func(model, ids_list, ["true", "false"], id_to_token)
     return result

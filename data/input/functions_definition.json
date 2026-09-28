@@ -67,17 +67,5 @@
     "returns": {
       "type": "string"
     }
-  },
-  {
-    "name": "fn_meteo",
-    "description": "degree of season in Madagascar, Antananarivo.",
-    "parameters": {
-      "degree": {
-        "type": "number"
-      }
-    },
-    "returns": {
-      "type": "number"
-    }
   }
 ]

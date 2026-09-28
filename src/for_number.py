@@ -2,10 +2,8 @@ from llm_sdk import Small_LLM_Model
 
 
 def generate_number_value(
-        model: Small_LLM_Model,
-        ids_list: list[int],
-        id_to_token: dict[int, str]
-    ) -> str:
+    model: Small_LLM_Model, ids_list: list[int], id_to_token: dict[int, str]
+) -> str:
     """Generate a valid number value using constrained decoding.
 
     Args:
@@ -24,7 +22,9 @@ def generate_number_value(
 
         raw_best_id = max(range(len(logits)), key=lambda i: logits[i])
         raw_best_text = id_to_token.get(raw_best_id, "")
-        if already_written and (raw_best_text.startswith(",") or raw_best_text.startswith("}")):
+        if already_written and (
+            raw_best_text.startswith(",") or raw_best_text.startswith("}")
+        ):
             break
 
         filtered_logits = list(logits)
@@ -44,9 +44,12 @@ def generate_number_value(
                     est_valide = False
 
             if not est_valide:
-                filtered_logits[token_id] = float('-inf')
+                filtered_logits[token_id] = float("-inf")
 
-        best_id = max(range(len(filtered_logits)), key=lambda i: filtered_logits[i])
+        best_id = max(
+            range(len(filtered_logits)),
+            key=lambda i: filtered_logits[i]
+            )
         token_text = id_to_token.get(best_id, "")
 
         already_written += token_text
