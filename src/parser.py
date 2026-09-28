@@ -1,37 +1,75 @@
-import json
-from .functions import FunctionDefinition 
+"""Utilities for loading and parsing JSON input files."""
+
+from src.models import FunctionDefinition, Prompt
 from pydantic import ValidationError
+import json
 
 
-def load_json(path_file: str) -> dict | None:
+def opening_file(file: str):
+    """Load and parse a JSON file.
+
+    Args:
+        file: Path to the JSON file.
+
+    Returns:
+        The data loaded from the JSON file.
+
+    Raises:
+        ValueError: If the file does not exist or contains invalid JSON.
+    """
     try:
-        with open(path_file, "r", encoding="utf-8") as f:
+        with open(file) as f:
             data = json.load(f)
         return data
     except FileNotFoundError:
-        print("Error: File not Found")
-        return
+        raise ValueError(f"File not found: {file}")
     except json.JSONDecodeError:
-        print("Error at the json file")
-        return
+        raise ValueError(f"Invalid JSON in file: {file}")
 
 
-def  parser_functions(path_file: str) -> list[FunctionDefinition]:
-    raw_data = load_json(path_file)
+def parser_json(file: str) -> list[FunctionDefinition]:
+    """Parse function definitions from a JSON file.
+
+    Each JSON object is validated as a FunctionDefinition.
+
+    Args:
+        file: Path to the function definitions file.
+
+    Returns:
+        A list of valid FunctionDefinition objects.
+    """
+    data = opening_file(file)
     result = []
-    if raw_data is None:
-        raise ValueError("the json file is empty")
-    for element in raw_data:
+
+    for element in data:
         try:
-            function_definition = FunctionDefinition(**element)
-            result.append(function_definition)
+            func_def = FunctionDefinition(**element)
+            result.append(func_def)
         except ValidationError as e:
-            print(f"Error: {e}")
+            print(e)
+
     return result
 
 
-if __name__ == "__main__":
-    result = parser_functions('data/input/functions_definition.json')
-    print(f"Nombre de fonctions chargee: {len(result)}")
-    for f in result:
-        print(f.name)
+def parser_prompts(file: str) -> list[Prompt]:
+    """Parse prompts from a JSON file.
+
+    Each JSON object is validated as a Prompt.
+
+    Args:
+        file: Path to the prompts file.
+
+    Returns:
+        A list of valid Prompt objects.
+    """
+    data = opening_file(file)
+    result = []
+
+    for element in data:
+        try:
+            prompt = Prompt(**element)
+            result.append(prompt)
+        except ValidationError as e:
+            print(e)
+
+    return result
