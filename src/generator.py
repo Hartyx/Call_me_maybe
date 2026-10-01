@@ -48,36 +48,32 @@ def generate_function_call(
     Raises:
         ValueError: If the generated function name is not found.
     """
-    # 1. choisir le nom de fonction
+    def encode_fixed_text(text: str) -> None:
+        """Encode fixed text and append its token IDs to ids_list.
+
+        Args:
+            text: Fixed text to encode and add to context.
+        """
+        new_ids = model.encode(text)[0].tolist()
+        ids_list.extend(new_ids)
     all_name = [func.name for func in all_functions]
     chosen_name = get_fullname_func(model, ids_list, all_name, id_to_token)
-
-    # 2. trouver la definition complete
     func_def = None
     for func in all_functions:
         if func.name == chosen_name:
             func_def = func
             break
+
     if func_def is None:
         raise ValueError(f"ERROR: Function {chosen_name} is not found")
-
-    # 3. commencer le JSON et mettre a jour le contexte
-    new_ids = model.encode(', "parameters": {')[0].tolist()
-    ids_list.extend(new_ids)
+    encode_fixed_text(', "parameters": {')
     result = f'{{"name": "{chosen_name}", "parameters": {{'
-
-    # 4. generer chaque parametre
     name_params = list(func_def.parameters.keys())
+
     for i, name in enumerate(name_params):
-
-        # ajouter la cle du parametre au contexte
-        new_ids = model.encode(f'"{name}": ')[0].tolist()
-        ids_list.extend(new_ids)
+        encode_fixed_text(f'"{name}": ')
         result += f'"{name}": '
-
-        # generer la valeur selon le type
         param_type = func_def.parameters[name].type
-
         if param_type == "number":
             value = generate_number_value(model, ids_list, id_to_token)
         elif param_type == "string":
@@ -86,18 +82,11 @@ def generate_function_call(
             value = generate_bool_value(model, ids_list, id_to_token)
         else:
             raise ValueError(f"ERROR: Unknown type {param_type}")
-
         result += value
-
-        # ajouter virgule si pas le dernier parametre
         if i < len(name_params) - 1:
-            new_ids = model.encode(", ")[0].tolist()
-            ids_list.extend(new_ids)
+            encode_fixed_text(", ")
             result += ", "
 
-    # 5. fermer le JSON
-    new_ids = model.encode("}}")[0].tolist()
-    ids_list.extend(new_ids)
+    encode_fixed_text("}}")
     result += "}}"
-
     return result

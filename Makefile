@@ -13,7 +13,6 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type d -name ".mypy_cache" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -exec rm -f {} +
-	rm -rf data/output
 
 lint:
 	uv run python -m flake8 src

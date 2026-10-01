@@ -1,11 +1,11 @@
-"""Entry point for the function calling generation pipeline."""
+"""Process prompts and generate constrained function calls."""
 
 from llm_sdk import Small_LLM_Model
 import json
 import argparse
-from pathlib import Path
 from src import parser_prompts, parser_json, Result
 from src.generator import generate_function_call
+from pathlib import Path
 
 
 def process_all_prompts(
@@ -13,17 +13,18 @@ def process_all_prompts(
     tests_path: str,
     output_path: str,
 ) -> None:
-    """Process all prompts and generate function calls.
+    """Process all prompts and save the generated function calls.
+
+    Loads the available functions and test prompts, generates a constrained
+    function call for each prompt, and saves the results as JSON.
 
     Args:
-        functions_path: Path to functions_definition.json.
-        tests_path: Path to function_calling_tests.json.
-        output_path: Path to write the output JSON file.
+        functions_path: Path to the function definitions JSON file.
+        tests_path: Path to the test prompts JSON file.
+        output_path: Path where the results will be saved.
     """
-    # 1. charger le modele
     model = Small_LLM_Model()
 
-    # 2. charger le vocabulaire
     vocab_path = model.get_path_to_vocab_file()
     with open(vocab_path, encoding="utf-8") as f:
         vocab = json.load(f)
@@ -35,53 +36,48 @@ def process_all_prompts(
     for tok in tok_data.get("added_tokens", []):
         id_to_token[tok["id"]] = tok["content"]
 
-    # 3. charger les fonctions et les prompts
     all_functions = parser_json(functions_path)
     all_prompts = parser_prompts(tests_path)
 
-    # 4. generer les resultats
     result = []
+
     for prompt_entry in all_prompts:
-        try:
-            question = prompt_entry.prompt
-            functions_json = json.dumps([f.model_dump() for f in all_functions])
+        question = prompt_entry.prompt
 
-            texte_complet = (
-                f"Available functions: {functions_json}\n\n"
-                f"Question: {question}\n"
-                f"Select the most appropriate function and extract "
-                f"the exact values from the question as parameters.\n"
-                f"Answer with a JSON object: "
-            )
+        functions_json = json.dumps([f.model_dump() for f in all_functions])
 
-            ids_list = model.encode(texte_complet)[0].tolist()
-            genere = generate_function_call(
-                model,
-                ids_list,
-                all_functions,
-                id_to_token
-            )
-            parse = json.loads(genere)
-            res = Result(
-                prompt=question,
-                name=parse["name"],
-                parameters=parse["parameters"]
-            )
-            result.append(res)
+        guide = "\n".join(
+            [f"- use {func.name} for: {func.description}" for func in all_functions]
+        )
 
-        except Exception as e:
-            print(f"ERROR processing prompt '{prompt_entry.prompt}': {e}")
+        texte_complet = (
+            "Available functions: "
+            f"{functions_json}\n\n"
+            f"Question: {question}\n"
+            f"Function guide:\n{guide}\n"
+            f"Answer with a JSON object: "
+        )
 
-    # 5. ecrire le fichier output
-    output_file = Path(output_path)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
+        ids_tensor = model.encode(texte_complet)
+        ids_list = ids_tensor[0].tolist()
+
+        genere = generate_function_call(model, ids_list, all_functions, id_to_token)
+
+        parse = json.loads(genere)
+
+        res = Result(
+            prompt=question, name=parse["name"], parameters=parse["parameters"]
+        )
+
+        result.append(res)
 
     output_data = [r.model_dump() for r in result]
     texte = json.dumps(output_data, indent=2)
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(texte)
-
-    print(f"Output written to {output_path}")
 
 
 if __name__ == "__main__":
@@ -91,22 +87,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--functions_definition",
         default="data/input/functions_definition.json",
-        help="Path to the functions definition JSON file."
+        help="Path to the functions definition JSON file.",
     )
     parser.add_argument(
         "--input",
         default="data/input/function_calling_tests.json",
-        help="Path to the input prompts JSON file."
+        help="Path to the input prompts JSON file.",
     )
     parser.add_argument(
         "--output",
         default="data/output/function_calling_results.json",
-        help="Path to the output JSON file."
+        help="Path to the output JSON file.",
     )
     args = parser.parse_args()
 
-    process_all_prompts(
-        args.functions_definition,
-        args.input,
-        args.output
-    )
+    process_all_prompts(args.functions_definition, args.input, args.output)
